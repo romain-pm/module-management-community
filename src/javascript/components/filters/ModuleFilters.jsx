@@ -1,13 +1,14 @@
-import React, {useState} from 'react';
+import React from 'react';
 import * as PropTypes from 'prop-types';
-import {Input} from '@jahia/moonstone';
+import {CheckboxGroup, CheckboxItem, CollectionBar, Input} from '@jahia/moonstone';
 import {useTranslation} from 'react-i18next';
-import {FilterChip} from './FilterChip';
-import {CheckMenuItem} from '../menu/MenuItems';
 import {BUNDLE_TYPES} from '../../utils/moduleFilters';
 import styles from './Filters.scss';
 
-const toggleValue = (values, value) => (values.includes(value) ? values.filter(v => v !== value) : [...values, value]);
+// CollectionBar puts the name of the filter where its labels hold {{name}}, so i18next keeps that placeholder.
+const KEEP_NAME = {name: '{{name}}', interpolation: {escapeValue: false}};
+
+const toggleValue = (values, value, isChecked) => (isChecked ? [...values, value] : values.filter(v => v !== value));
 
 /** The name filter stays open in the filter row, and the table follows each key the user types. */
 const NameFilter = ({filters, onChange}) => {
@@ -26,73 +27,82 @@ const NameFilter = ({filters, onChange}) => {
     );
 };
 
-const TypeFilter = ({filters, onChange, ...chip}) => {
-    const {t} = useTranslation('module-management-community');
-    const value = BUNDLE_TYPES.filter(type => filters.types.includes(type)).join(', ');
-    return (
-        <FilterChip {...chip} id="type" name={t('label.filters.type')} value={value} onClear={() => onChange('types', [])}>
-            {BUNDLE_TYPES.map(type => (
-                <CheckMenuItem key={type}
-                               label={type}
-                               isChecked={filters.types.includes(type)}
-                               data-testid="filter-type"
-                               data-type={type}
-                               onToggle={() => onChange('types', toggleValue(filters.types, type))}/>
+/** A filter whose selector lists its options as check boxes, and whose chip names the checked options. */
+const optionFilter = ({key, label, options, values, onChange}) => ({
+    key,
+    label,
+    valueLabel: options.filter(option => values.includes(option)).join(', '),
+    isDisplayedByDefault: true,
+    onClear: () => onChange([]),
+    selector: (
+        <CheckboxGroup name={`module-filter-${key}`} aria-label={label}>
+            {options.map(option => (
+                <CheckboxItem key={option}
+                              value={option}
+                              label={option}
+                              checked={values.includes(option)}
+                              data-testid={`filter-${key}`}
+                              {...{[`data-${key}`]: option}}
+                              onChange={(_event, _value, isChecked) => onChange(toggleValue(values, option, isChecked))}/>
             ))}
-        </FilterChip>
-    );
-};
+        </CheckboxGroup>
+    )
+});
 
-const StateFilter = ({filters, states, onChange, ...chip}) => {
-    const {t} = useTranslation('module-management-community');
-    const value = states.filter(state => filters.states.includes(state)).join(', ');
-    return (
-        <FilterChip {...chip} id="state" name={t('label.filters.state')} value={value} onClear={() => onChange('states', [])}>
-            {states.map(state => (
-                <CheckMenuItem key={state}
-                               label={state}
-                               isChecked={filters.states.includes(state)}
-                               data-testid="filter-state"
-                               data-state={state}
-                               onToggle={() => onChange('states', toggleValue(filters.states, state))}/>
-            ))}
-        </FilterChip>
-    );
-};
+const updatesFilter = ({filters, t, onChange}) => ({
+    key: 'updates',
+    label: t('label.filters.updates'),
+    valueLabel: filters.updatesOnly ? t('label.filters.updatesValue') : '',
+    isDisplayedByDefault: true,
+    onClear: () => onChange('updatesOnly', false),
+    selector: (
+        <CheckboxGroup name="module-filter-updates" aria-label={t('label.filters.updates')}>
+            <CheckboxItem value="updatesOnly"
+                          label={t('label.input.updatesOnly')}
+                          checked={filters.updatesOnly}
+                          data-testid="filter-updates"
+                          onChange={(_event, _value, isChecked) => onChange('updatesOnly', isChecked)}/>
+        </CheckboxGroup>
+    )
+});
 
-const UpdatesFilter = ({filters, onChange, ...chip}) => {
-    const {t} = useTranslation('module-management-community');
-    return (
-        <FilterChip {...chip}
-                    id="updates"
-                    name={t('label.filters.updates')}
-                    value={filters.updatesOnly ? t('label.filters.updatesValue') : ''}
-                    onClear={() => onChange('updatesOnly', false)}
-        >
-            <CheckMenuItem label={t('label.input.updatesOnly')}
-                           isChecked={filters.updatesOnly}
-                           data-testid="filter-updates"
-                           onToggle={() => onChange('updatesOnly', !filters.updatesOnly)}/>
-        </FilterChip>
-    );
-};
-
-/** Every filter is always in the row. The Updates filter shows only when an update is available. */
+/**
+ * Every filter is always in the row. The Updates filter shows while an update is available or while it is applied.
+ * CollectionBar has no slot for a search field, so the name filter sits before the bar.
+ */
 export const ModuleFilters = ({filters, states, hasUpdates, onChange}) => {
-    const [openFilter, setOpenFilter] = useState(null);
-
-    const chip = id => ({
-        isOpen: openFilter === id,
-        onOpen: () => setOpenFilter(id),
-        onClose: () => setOpenFilter(null)
-    });
+    const {t} = useTranslation('module-management-community');
+    const barFilters = [
+        optionFilter({
+            key: 'type',
+            label: t('label.filters.type'),
+            options: BUNDLE_TYPES,
+            values: filters.types,
+            onChange: types => onChange('types', types)
+        }),
+        optionFilter({
+            key: 'state',
+            label: t('label.filters.state'),
+            options: states,
+            values: filters.states,
+            onChange: values => onChange('states', values)
+        })
+    ];
+    if (hasUpdates || filters.updatesOnly) {
+        barFilters.push(updatesFilter({filters, t, onChange}));
+    }
 
     return (
         <div className={styles.filters} data-testid="module-filters">
             <NameFilter filters={filters} onChange={onChange}/>
-            <TypeFilter {...chip('type')} filters={filters} onChange={onChange}/>
-            <StateFilter {...chip('state')} filters={filters} states={states} onChange={onChange}/>
-            {hasUpdates && <UpdatesFilter {...chip('updates')} filters={filters} onChange={onChange}/>}
+            <CollectionBar className={styles.bar}
+                           filters={barFilters}
+                           i18n={{
+                               toolbarLabel: t('label.filters.bar'),
+                               filterName: t('label.filters.chipName', KEEP_NAME),
+                               clearFilter: t('label.filters.clearOne', KEEP_NAME),
+                               closeButton: t('label.close')
+                           }}/>
         </div>
     );
 };
@@ -104,15 +114,10 @@ const filtersShape = PropTypes.shape({
     updatesOnly: PropTypes.bool.isRequired
 });
 
-const chipPropTypes = {
+NameFilter.propTypes = {
     filters: filtersShape.isRequired,
     onChange: PropTypes.func.isRequired
 };
-
-NameFilter.propTypes = chipPropTypes;
-TypeFilter.propTypes = chipPropTypes;
-UpdatesFilter.propTypes = chipPropTypes;
-StateFilter.propTypes = {...chipPropTypes, states: PropTypes.arrayOf(PropTypes.string).isRequired};
 
 ModuleFilters.propTypes = {
     filters: filtersShape.isRequired,
