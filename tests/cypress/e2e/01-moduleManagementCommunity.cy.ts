@@ -24,17 +24,19 @@ describe('Module Management Community', () => {
         cy.get(root, {timeout: 10000}).should('be.visible');
     };
 
-    const filterChip = (id: string) => `[data-testid="filter-chip"][data-filter="${id}"]`;
+    // The Moonstone CollectionBar marks each chip and its selector dialog with the key of the filter.
+    const filterChip = (id: string) => `[data-testid="module-filters"] [data-filter="${id}"]`;
+    const filterEditor = (id: string) => `[role="dialog"][data-filter="${id}"]`;
     const nameFilter = () => cy.get(`[data-testid="module-filters"] input[placeholder="${nameFilterPlaceholder}"]`);
 
-    /** Open the editor of a filter chip */
+    /** Open the selector of a filter chip */
     const openFilter = (id: string) => {
-        cy.get(`${filterChip(id)} [data-testid="filter-chip-edit"]`).click();
-        cy.get(`[data-testid="filter-editor"][data-filter="${id}"]`).should('be.visible');
+        cy.get(`${filterChip(id)} button[aria-haspopup="dialog"]`).click();
+        cy.get(filterEditor(id)).should('be.visible');
     };
 
     const closeFilterEditor = () => {
-        cy.get('[data-testid="filter-editor-close"]').click();
+        cy.get('[role="dialog"][data-filter]').contains('button', 'Close').click();
     };
 
     /** Type a name in the name filter, which is always open in the filter row */
@@ -100,7 +102,7 @@ describe('Module Management Community', () => {
             cy.get(filterChip('name')).should('not.exist');
             cy.get(filterChip('type')).should('be.visible');
             cy.get(filterChip('state')).should('be.visible');
-            cy.get('[data-testid="filter-add"]').should('not.exist');
+            cy.get('[data-testid="module-filters"]').contains('button', 'Add filter').should('not.exist');
         });
 
         it('defaults the Type filter to the Jahia module types', () => {
@@ -117,7 +119,8 @@ describe('Module Management Community', () => {
         });
 
         it('renders Refresh, Upload module and Install from store in the action bar', () => {
-            cy.get('[role="toolbar"]').within(() => {
+            // The filter row is a toolbar too, from 3 controls on.
+            cy.get(root).find('header [role="toolbar"]').within(() => {
                 cy.contains('button', 'Refresh').should('be.visible');
                 cy.contains('button', 'Upload module').should('be.visible');
                 cy.contains('button', 'Install from store').should('be.visible');
@@ -215,7 +218,7 @@ describe('Module Management Community', () => {
         });
 
         it('the clear button of the Type chip shows every type, the module included', () => {
-            cy.get(`${filterChip('type')} [data-testid="filter-chip-clear"]`).click();
+            cy.get(`${filterChip('type')} button[aria-label="Clear the Type filter"]`).click();
             cy.contains('tr', testBundle).should('be.visible');
         });
     });

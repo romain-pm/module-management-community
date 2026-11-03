@@ -427,6 +427,7 @@
       "state": "State",
       "updates": "Updates",
       "updatesValue": "available only",
+      "bar": "Module filters",
       "clear": "Clear filters",
       "clearOne": "Clear the {{name}} filter",
       "chipName": "{{name}}:",

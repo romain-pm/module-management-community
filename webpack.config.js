@@ -9,6 +9,13 @@ const getModuleFederationConfig = require('@jahia/webpack-config/getModuleFedera
 const packageJson = require('./package.json');
 const {CycloneDxWebpackPlugin} = require('@cyclonedx/webpack-plugin');
 
+// package.json takes the preview package of the CollectionBar (Jahia/moonstone#1625) by URL, and the shared config
+// reads the version of a dependency as a semver range. Remove this once a Moonstone release has the CollectionBar.
+const federationPackageJson = {
+    ...packageJson,
+    dependencies: {...packageJson.dependencies, '@jahia/moonstone': '^2.21.0'}
+};
+
 /** @type {import('@cyclonedx/webpack-plugin').CycloneDxWebpackPluginOptions} */
 const cycloneDxWebpackPluginOptions = {
     specVersion: '1.4',
@@ -106,7 +113,7 @@ module.exports = (env, argv) => {
             ]
         },
         plugins: [
-            new ModuleFederationPlugin(getModuleFederationConfig(packageJson, {
+            new ModuleFederationPlugin(getModuleFederationConfig(federationPackageJson, {
                 remotes: {
                     '@jahia/jcontent': 'appShell.remotes.jcontent'
                 },
